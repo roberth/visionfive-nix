@@ -1,13 +1,34 @@
 { inputs, ... }:
-{ lib, pkgs, ... }:
+{ config, lib, pkgs, ... }:
+let
+  pkgsForKernel =
+    if config.boot.pinnedKernel
+    then
+      import inputs.nixpkgs {
+        config = {};
+        overlays = [];
+        crossSystem = pkgs.hostPlatform;
+        localSystem = pkgs.buildPlatform;
+      }
+    else pkgs;
+in
 {
   disabledModules = [
     "profiles/all-hardware.nix" # references virtio_pci kernel module, which we don't have
   ];
 
+  options = {
+    boot.pinnedKernel = lib.mkOption {
+      description = ''
+        Whether to build the kernel with a version of Nixpkgs that's known to be buildable.
+      '';
+      default = false;
+    };
+  };
+
   config = {
     boot = {
-      kernelPackages = pkgs.linuxPackagesFor (import ./package/default.nix { inherit pkgs inputs; });
+      kernelPackages = pkgsForKernel.linuxPackagesFor (import ./package/default.nix { inherit inputs; pkgs = pkgsForKernel; });
 
       kernelParams = [
         "console=tty0"
